@@ -48,7 +48,7 @@ class SimpleNet(nn.Module):
         self.img_size = img_size
         self.layers_to_extract_from = ['layer2', 'layer3']
         self.embed_dim = embed_dim
-        self.device = device
+        self.device = device = torch.device(device)
 
         self.backbone = resnet.wide_resnet50_2(True).to(device)
         self.forward_modules = torch.nn.ModuleDict({})
@@ -118,37 +118,29 @@ class SimpleNet(nn.Module):
         features = self.forward_modules["preadapt_aggregator"](features)  # further pooling
 
         return features, patch_shapes
-    def forward(self, images):
+    def forward(self, images, mode='eval'):
         """Infer score and mask for a batch of images."""
         images = images.to(torch.float).to(self.device)
         _ = self.forward_modules.eval()
 
         batchsize = images.shape[0]
-        self.pre_projection.eval()
-        self.discriminator.eval()
-        with torch.no_grad():
+        if mode == 'eval':
+            self.pre_projection.eval()
+            self.discriminator.eval()
+            with torch.no_grad():
+                features, patch_shapes = self.embed(images)
+                features = self.pre_projection(features)
+                scores = self.discriminator(features)
+        elif mode == 'train':
+            self.pre_projection.train()
+            self.discriminator.train()
             features, patch_shapes = self.embed(images)
             features = self.pre_projection(features)
-
-            patch_scores = image_scores = -self.discriminator(features)
-            patch_scores = patch_scores.cpu().numpy()
-            image_scores = image_scores.cpu().numpy()
-
-            image_scores = self.patch_maker.unpatch_scores(
-                image_scores, batchsize=batchsize
-            )
-            image_scores = image_scores.reshape(*image_scores.shape[:2], -1)
-            image_scores = self.patch_maker.score(image_scores)
-
-            patch_scores = self.patch_maker.unpatch_scores(
-                patch_scores, batchsize=batchsize
-            )
-            scales = patch_shapes[0]
-            patch_scores = patch_scores.reshape(batchsize, scales[0], scales[1])
-            features = features.reshape(batchsize, scales[0], scales[1], -1)
-            masks, features = self.anomaly_segmentor.convert_to_segmentation(patch_scores, features)
-
-        return list(image_scores), list(masks), list(features)
+            '''
+            TODO: Add Noise
+            '''
+            scores = self.discriminator(features)
+        return scores
 
 
 class PatchMaker:

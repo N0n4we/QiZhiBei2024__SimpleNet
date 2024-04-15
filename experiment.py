@@ -1,4 +1,4 @@
-from torch.optim import AdamW
+from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 import torchvision.utils as vutils
 import torch
@@ -14,11 +14,11 @@ class Experiment:
         params,
         device='gpu'
     ):
-        self.model = model.to(device)
+        self.model = model
         self.params = params
         self.device = torch.device(device)
 
-        self.optimizer = AdamW(self.model.parameters(), lr=self.params['LR'])
+        self.optimizer = Adam(self.model.parameters(), lr=self.params['LR'])
         self.scheduler = ExponentialLR(self.optimizer, gamma=self.params['scheduler_gamma'])
         self.num_steps = 0
         self.log_dir = os.path.join(self.params['save_dir'], self.params['version'])
@@ -30,13 +30,12 @@ class Experiment:
         return self.model(x)
 
     def training_step(self, batch):
-        batch_erased = erase_and_norm(batch.clone())
         batch = normalize(batch)
-        
-        batch_erased = batch_erased.to(self.device)
         batch = batch.to(self.device)
-        
-        results = self.forward(batch_erased)[0]
+
+        scores = self.forward(batch)
+
+
         train_loss = self.model.loss_function(results, batch)
         self.optimizer.zero_grad()
         train_loss.backward()
