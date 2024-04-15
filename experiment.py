@@ -12,7 +12,7 @@ class Experiment:
         self,
         model,
         params,
-        device='cpu'
+        device='gpu'
     ):
         self.model = model.to(device)
         self.params = params
@@ -20,8 +20,7 @@ class Experiment:
 
         self.optimizer = AdamW(self.model.parameters(), lr=self.params['LR'])
         self.scheduler = ExponentialLR(self.optimizer, gamma=self.params['scheduler_gamma'])
-        self.num_steps = 0   
-        self.model.train()
+        self.num_steps = 0
         self.log_dir = os.path.join(self.params['save_dir'], self.params['version'])
         
         self.writer = SummaryWriter(self.log_dir)

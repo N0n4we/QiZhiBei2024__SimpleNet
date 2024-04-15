@@ -40,6 +40,7 @@ class SimpleNet(nn.Module):
                  channels=3,
                  img_size=224,
                  embed_dim=1600,
+                 input_shape=(3, 224, 224),
                  device='gpu',
                  ):
         super(SimpleNet, self).__init__()
@@ -55,7 +56,7 @@ class SimpleNet(nn.Module):
             self.backbone, self.layers_to_extract_from, self.device, train_backbone=False
         )
         self.forward_modules["feature_aggregator"] = feature_aggregator
-        feature_dimensions = feature_aggregator.feature_dimensions(input_shape=[3, 224, 224])
+        feature_dimensions = feature_aggregator.feature_dimensions(input_shape=input_shape)
         preprocessing = common.Preprocessing(
             feature_dimensions, embed_dim
         )
@@ -65,10 +66,13 @@ class SimpleNet(nn.Module):
         )
         _ = preadapt_aggregator.to(self.device)
         self.forward_modules["preadapt_aggregator"] = preadapt_aggregator
-        self.projection = Projection(self.embed_dim)
-        self.discriminator = Discriminator(self.embed_dim)
+        self.projection = Projection(self.embed_dim).to(device)
+        self.discriminator = Discriminator(self.embed_dim).to(device)
 
         self.patch_maker = PatchMaker(self.img_size)
+        self.anomaly_segmentor = common.RescaleSegmentor(
+            device=self.device, target_size=input_shape[-2:]
+        )
 
     def embed(self, img):
         with torch.no_grad():
@@ -114,7 +118,7 @@ class SimpleNet(nn.Module):
         features = self.forward_modules["preadapt_aggregator"](features)  # further pooling
 
         return features, patch_shapes
-    def predict(self, images):
+    def forward(self, images):
         """Infer score and mask for a batch of images."""
         images = images.to(torch.float).to(self.device)
         _ = self.forward_modules.eval()
@@ -154,9 +158,10 @@ class PatchMaker:
         self.top_k = top_k
 
     def patchify(self, features, return_spatial_info=False):
-        """Convert a tensor into a tensor of respective patches.
+        """
+        Convert a tensor into a tensor of respective patches.
         Args:
-            x: [torch.Tensor, bs x c x w x h]
+            features: [torch.Tensor, bs x c x w x h]
         Returns:
             x: [torch.Tensor, bs * w//stride * h//stride, c, patchsize,
             patchsize]
@@ -185,10 +190,7 @@ class PatchMaker:
         return x.reshape(batchsize, -1, *x.shape[1:])
 
     def score(self, x):
-        was_numpy = False
-        if isinstance(x, np.ndarray):
-            was_numpy = True
-            x = torch.from_numpy(x)
+        x = torch.from_numpy(x)
         while x.ndim > 2:
             x = torch.max(x, dim=-1).values
         if x.ndim == 2:
@@ -196,6 +198,4 @@ class PatchMaker:
                 x = torch.topk(x, self.top_k, dim=1).values.mean(1)
             else:
                 x = torch.max(x, dim=1).values
-        if was_numpy:
-            return x.numpy()
-        return x
+        return x.numpy()
