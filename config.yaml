@@ -2,7 +2,7 @@ model_params:
   channels: 3
   img_size: 224
   embed_dim: 1600
-  input_shape: (3, 224, 224)
+  input_shape: [3, 224, 224]
   
 data_params:
   data_path: "data/"
