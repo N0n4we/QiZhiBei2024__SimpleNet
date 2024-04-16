@@ -41,13 +41,14 @@ class SimpleNet(nn.Module):
                  img_size=224,
                  embed_dim=1600,
                  input_shape=(3, 224, 224),
-                 device='gpu',
+                 device='cpu',
                  ):
         super(SimpleNet, self).__init__()
 
         self.img_size = img_size
         self.layers_to_extract_from = ['layer2', 'layer3']
         self.embed_dim = embed_dim
+        self.mix_noise = 1
         self.device = device = torch.device(device)
 
         self.backbone = resnet.wide_resnet50_2(True).to(device)
@@ -130,17 +131,30 @@ class SimpleNet(nn.Module):
             with torch.no_grad():
                 features, patch_shapes = self.embed(images)
                 features = self.pre_projection(features)
+                batchlen = features[0]
                 scores = self.discriminator(features)
+
+                return scores, batchlen, patch_shapes
+
         elif mode == 'train':
             self.pre_projection.train()
             self.discriminator.train()
-            features, patch_shapes = self.embed(images)
-            features = self.pre_projection(features)
-            '''
-            TODO: Add Noise
-            '''
-            scores = self.discriminator(features)
-        return scores
+            true_feats, patch_shapes = self.embed(images)
+            true_feats = self.pre_projection(true_feats)
+            batchlen = true_feats[0]
+
+            noise_idxs = torch.randint(0, self.mix_noise, torch.Size([true_feats.shape[0]]))
+            noise_one_hot = torch.nn.functional.one_hot(noise_idxs, num_classes=self.mix_noise).to(
+                self.device)  # (N, K)
+            noise = torch.stack([
+                torch.normal(0, self.noise_std * 1.1 ** (k), true_feats.shape)
+                for k in range(self.mix_noise)], dim=1).to(self.device)  # (N, K, C)
+            noise = (noise * noise_one_hot.unsqueeze(-1)).sum(1)
+            fake_feats = true_feats + noise
+
+            scores = self.discriminator(torch.cat([true_feats, fake_feats]))
+
+            return scores, batchlen
 
 
 class PatchMaker:

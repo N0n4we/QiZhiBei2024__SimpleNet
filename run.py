@@ -27,7 +27,7 @@ def same_seeds(seed):
 
 same_seeds(config['train_params']['seeds'])
 
-Path(os.path.join(config["exp_params"]["save_dir"], config["exp_params"]["version"], 'Samples')).mkdir(exist_ok=True, parents=True)
+Path(str(os.path.join(config["exp_params"]["save_dir"], config["exp_params"]["version"], 'Samples'))).mkdir(exist_ok=True, parents=True)
 
 use_wandb = config['train_params']['use_wandb']
 if use_wandb is True:
@@ -35,11 +35,15 @@ if use_wandb is True:
     wandb.login(key='fb044de2f69c1a28a75f99d8dcd43f7104cfd136')
     wandb.init(project='QiZhiBei', name=config["exp_params"]['version'])
     
-    def wandb_log(loss, step, epoch=None, mode='train'):
+    def wandb_log(loss, step, p_true=None, p_fake=None, epoch=None, mode='train'):
         if mode == 'train':
             wandb.log({'loss': loss}, step = step)
             if epoch is not None:
                 wandb.log({'Epoch': epoch}, step = step)
+            if p_true is not None:
+                wandb.log({'p_true': p_true}, step = step)
+            if p_fake is not None:
+                wandb.log({'p_fake': p_fake}, step = step)
         elif mode == 'valid':
             wandb.log({'valid_loss': loss}, step = step)
             if epoch is not None:
@@ -58,21 +62,20 @@ if __name__ == '__main__':
         print(f"========Epoch {epoch}========")
         progress_bar = tqdm(enumerate(train_dataloader), total=len(train_dataloader))
         for idx, batch in progress_bar:
-            train_loss = experiment.training_step(batch)
+            train_loss, p_true, p_fake = experiment.training_step(batch)
             
             progress_bar.set_description(f"Processing batch {idx}")
             progress_bar.set_postfix(loss = f'{train_loss.item():.4f}')
 
             if use_wandb is True:
-                wandb_log(train_loss, step = experiment.num_steps, epoch = epoch)
+                wandb_log(train_loss, p_true=p_true, p_fake=p_fake, step = experiment.num_steps, epoch = epoch)
             experiment.log_epoch(epoch)
         # sample
         batch_ng = next(iter(test_dataloader))
-        batch_ok = next(iter(train_dataloader))[:config['data_params']['test_batch_size']]
-        pic_path = experiment.sample_images(batch_ng, batch_ok)
+        pic_path = experiment.sample_images(batch_ng)
         if use_wandb is True:
             img = Image.open(pic_path)
-            wandb.log({'ng_repair_recons': [wandb.Image(img, caption=f'Epoch_{epoch}-step_{experiment.num_steps}')]}, step=experiment.num_steps)
+            wandb.log({'ng_masks': [wandb.Image(img, caption=f'Epoch_{epoch}-step_{experiment.num_steps}')]}, step=experiment.num_steps)
         if epoch % 5 == 0:
             experiment.checkpoint(epoch)
         

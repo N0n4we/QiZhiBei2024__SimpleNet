@@ -1,12 +1,8 @@
 model_params:
-  dim: 16
-  init_dim: 16
-  dim_mults: [ 1, 2, 4, 8]
   channels: 3
-  resnet_block_groups: 8
-  learned_sinusoidal_cond: False
-  random_fourier_features: False
-  learned_sinusoidal_dim: 16
+  img_size: 224
+  embed_dim: 1600
+  input_shape: (3, 224, 224)
   
 data_params:
   data_path: "data/"
@@ -16,15 +12,17 @@ data_params:
   pin_memory: True
   
 exp_params:
-  LR: 0.005
+  projLR: 0.005
+  dscLR: 0.01
+  dsc_margin: 0.5
   weight_decay: 0.0
   scheduler_gamma: 0.95
   device: 'cuda'
   save_dir: "logs"
-  version: 'v4.1_U'
+  version: 'SimpleNet_v0.1'
 
 train_params:
-  max_epochs: 800
-  use_wandb: True
+  max_epochs: 300
+  use_wandb: False
   seeds: 2024
 

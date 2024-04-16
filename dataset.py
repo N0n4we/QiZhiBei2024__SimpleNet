@@ -10,7 +10,7 @@ import random
 def enhanceBC(image, brightness, contrast):
     enhancer = ImageEnhance.Brightness(image)
     enhanced_im = enhancer.enhance(brightness)
-    enhancer = ImageEnhance.Contrast(image)
+    enhancer = ImageEnhance.Contrast(enhanced_im)
     enhanced_im = enhancer.enhance(contrast)
     return enhanced_im
 
