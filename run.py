@@ -56,7 +56,7 @@ if __name__ == '__main__':
     train_dataloader, test_dataloader = get_DataLoader(**config['data_params'])
     train_config = config['train_params']
     start_time = time.time()
-    print(torch.cuda.get_device_name(0))
+    # print(torch.cuda.get_device_name(0))
     # train
     for epoch in range(1, train_config['max_epochs']):
         print(f"========Epoch {epoch}========")

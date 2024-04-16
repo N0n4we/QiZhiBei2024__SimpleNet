@@ -6,17 +6,15 @@ model_params:
   
 data_params:
   data_path: "data/"
-  train_batch_size: 4
-  test_batch_size:  4
-  num_workers: 4
-  pin_memory: True
+  train_batch_size: 2
+  test_batch_size:  2
+  num_workers: 2
+  pin_memory: False
   
 exp_params:
   projLR: 0.005
   dscLR: 0.01
   dsc_margin: 0.5
-  weight_decay: 0.0
-  scheduler_gamma: 0.95
   device: 'cuda'
   save_dir: "logs"
   version: 'SimpleNet_v0.1'

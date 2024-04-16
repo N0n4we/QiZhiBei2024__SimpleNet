@@ -77,7 +77,7 @@ class SimpleNet(nn.Module):
 
     def embed(self, img):
         with torch.no_grad():
-            features = self.extractor(img)
+            features = self.forward_modules["feature_aggregator"](img)
         features = [features[layer] for layer in self.layers_to_extract_from]
 
         features = [
@@ -137,7 +137,7 @@ class SimpleNet(nn.Module):
                 return scores, batchlen, patch_shapes
 
         elif mode == 'train':
-            self.pre_projection.train()
+            self.projection.train()
             self.discriminator.train()
             true_feats, patch_shapes = self.embed(images)
             true_feats = self.pre_projection(true_feats)

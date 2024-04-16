@@ -42,14 +42,14 @@ def unnormalize(x):
 data_transforms = {
     'train':transforms.Compose([
         transforms.ToPILImage(),
-        transforms.Resize((256, 256)),
+        transforms.Resize((224, 224)),
         transforms.RandomHorizontalFlip(),
         RandomRotate90(),
         transforms.ToTensor(),
     ]),
     'test':transforms.Compose([
         transforms.ToPILImage(),
-        transforms.Resize((256, 256)),
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize((0.5,), (0.5,))
     ])
@@ -78,7 +78,7 @@ def get_DataLoader(data_path,
                    pin_memory
                    ):
     train_dir = os.path.join(data_path, 'train')
-    test_dir = os.path.join(data_path, 'valid')
+    test_dir = os.path.join(data_path, 'test')
     train_fnames = glob.glob(os.path.join(train_dir, '*'))
     test_fnames = glob.glob(os.path.join(test_dir, '*'))
     train_dataset = MyDataset(train_fnames, data_transforms['train'])
