@@ -2,7 +2,7 @@ model_params:
   channels: 3
   img_size: 224
   patchsize: 3
-  noise_std: 0.5
+  noise_std: 0.05
   embed_dim: 1600
   input_shape: [3, 224, 224]
   device: 'cuda'

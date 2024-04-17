@@ -52,13 +52,13 @@ data_transforms = {
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         RandomRotate90(),
-        Enhance(),
+        # Enhance(),
         transforms.ToTensor(),
     ]),
     'test':transforms.Compose([
         transforms.ToPILImage(),
         transforms.Resize((224, 224)),
-        Enhance(),
+        # Enhance(),
         transforms.ToTensor(),
     ])
 }
