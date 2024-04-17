@@ -136,8 +136,8 @@ class NetworkFeatureAggregator(torch.nn.Module):
             layers_to_extract_from: [list of str]
         """
         self.layers_to_extract_from = layers_to_extract_from
-        self.backbone = backbone
         self.device = device
+        self.backbone = backbone.to(self.device)
         self.train_backbone = train_backbone
         if not hasattr(backbone, "hook_handles"):
             self.backbone.hook_handles = []

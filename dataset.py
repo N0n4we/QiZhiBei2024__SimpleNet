@@ -14,6 +14,12 @@ def enhanceBC(image, brightness, contrast):
     enhanced_im = enhancer.enhance(contrast)
     return enhanced_im
 
+class Enhance:
+    def __init__(self, brightness=1.8, contrast=1.8):
+        self.brightness = brightness
+        self.contrast = contrast
+    def __call__(self, img):
+        return enhanceBC(img, self.brightness, self.contrast)
 
 class RandomRotate90:
     def __call__(self, img):
@@ -44,14 +50,16 @@ data_transforms = {
         transforms.ToPILImage(),
         transforms.Resize((224, 224)),
         transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
         RandomRotate90(),
+        Enhance(),
         transforms.ToTensor(),
     ]),
     'test':transforms.Compose([
         transforms.ToPILImage(),
         transforms.Resize((224, 224)),
+        Enhance(),
         transforms.ToTensor(),
-        transforms.Normalize((0.5,), (0.5,))
     ])
 }
 

@@ -4,6 +4,13 @@ import torch.nn.functional as F
 import resnet
 import common
 
+def init_weight(m):
+
+    if isinstance(m, torch.nn.Linear):
+        torch.nn.init.xavier_normal_(m.weight)
+    elif isinstance(m, torch.nn.Conv2d):
+        torch.nn.init.xavier_normal_(m.weight)
+
 class Projection(nn.Module):
     def __init__(self,
                  dim=1600,
@@ -11,6 +18,8 @@ class Projection(nn.Module):
         super(Projection, self).__init__()
         self.dim = dim
         self.proj = nn.Linear(dim, dim)
+        
+        self.apply(init_weight)
 
     def forward(self, x):
         return self.proj(x)
@@ -27,8 +36,16 @@ class Discriminator(nn.Module):
             nn.Linear(input_dim, 1200),
             nn.BatchNorm1d(1200),
             nn.LeakyReLU(0.2),
-            nn.Linear(1200, 1, bias=False)
+            nn.Linear(1200, 900),
+            nn.BatchNorm1d(900),
+            nn.LeakyReLU(0.2),
+            nn.Linear(900, 640),
+            nn.BatchNorm1d(640),
+            nn.LeakyReLU(0.2),
+            nn.Linear(640, 1, bias=False)
         )
+
+        self.apply(init_weight)
 
     def forward(self, x):
         return self.model(x)
@@ -39,19 +56,22 @@ class SimpleNet(nn.Module):
     def __init__(self,
                  channels=3,
                  img_size=224,
+                 patchsize=3,
+                 noise_std=0.5,
                  embed_dim=1600,
                  input_shape=(3, 224, 224),
-                 device='cpu',
+                 device = 'cpu'
                  ):
         super(SimpleNet, self).__init__()
-
+        self.device = torch.device(device)
         self.img_size = img_size
+        self.patchsize = patchsize
         self.layers_to_extract_from = ['layer2', 'layer3']
         self.embed_dim = embed_dim
+        self.noise_std = noise_std
         self.mix_noise = 1
-        self.device = device = torch.device(device)
 
-        self.backbone = resnet.wide_resnet50_2(True).to(device)
+        self.backbone = resnet.wide_resnet50_2(True).to(self.device)
         self.forward_modules = torch.nn.ModuleDict({})
         feature_aggregator = common.NetworkFeatureAggregator(
             self.backbone, self.layers_to_extract_from, self.device, train_backbone=False
@@ -67,10 +87,10 @@ class SimpleNet(nn.Module):
         )
         _ = preadapt_aggregator.to(self.device)
         self.forward_modules["preadapt_aggregator"] = preadapt_aggregator
-        self.projection = Projection(self.embed_dim).to(device)
-        self.discriminator = Discriminator(self.embed_dim).to(device)
+        self.projection = Projection(self.embed_dim).to(self.device)
+        self.discriminator = Discriminator(self.embed_dim).to(self.device)
 
-        self.patch_maker = PatchMaker(self.img_size)
+        self.patch_maker = PatchMaker(self.patchsize)
         self.anomaly_segmentor = common.RescaleSegmentor(
             device=self.device, target_size=input_shape[-2:]
         )
@@ -121,27 +141,28 @@ class SimpleNet(nn.Module):
         return features, patch_shapes
     def forward(self, images, mode='eval'):
         """Infer score and mask for a batch of images."""
-        images = images.to(torch.float).to(self.device)
+        images = images.to(self.device)
+        self.forward_modules["feature_aggregator"].to(self.device)
         _ = self.forward_modules.eval()
 
         batchsize = images.shape[0]
         if mode == 'eval':
-            self.pre_projection.eval()
-            self.discriminator.eval()
+            self.projection.eval().to(self.device)
+            self.discriminator.eval().to(self.device)
             with torch.no_grad():
                 features, patch_shapes = self.embed(images)
-                features = self.pre_projection(features)
+                features = self.projection(features)
                 batchlen = features[0]
                 scores = self.discriminator(features)
 
                 return scores, batchlen, patch_shapes
 
         elif mode == 'train':
-            self.projection.train()
-            self.discriminator.train()
+            self.projection.train().to(self.device)
+            self.discriminator.train().to(self.device)
             true_feats, patch_shapes = self.embed(images)
-            true_feats = self.pre_projection(true_feats)
-            batchlen = true_feats[0]
+            true_feats = self.projection(true_feats)
+            batchlen = true_feats.shape[0]
 
             noise_idxs = torch.randint(0, self.mix_noise, torch.Size([true_feats.shape[0]]))
             noise_one_hot = torch.nn.functional.one_hot(noise_idxs, num_classes=self.mix_noise).to(
@@ -149,9 +170,8 @@ class SimpleNet(nn.Module):
             noise = torch.stack([
                 torch.normal(0, self.noise_std * 1.1 ** (k), true_feats.shape)
                 for k in range(self.mix_noise)], dim=1).to(self.device)  # (N, K, C)
-            noise = (noise * noise_one_hot.unsqueeze(-1)).sum(1)
+            noise = (noise * noise_one_hot.unsqueeze(-1)).sum(1).to(self.device)
             fake_feats = true_feats + noise
-
             scores = self.discriminator(torch.cat([true_feats, fake_feats]))
 
             return scores, batchlen

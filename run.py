@@ -65,7 +65,7 @@ if __name__ == '__main__':
             train_loss, p_true, p_fake = experiment.training_step(batch)
             
             progress_bar.set_description(f"Processing batch {idx}")
-            progress_bar.set_postfix(loss = f'{train_loss.item():.4f}')
+            progress_bar.set_postfix(loss = f'{train_loss.item():.4f}', p_true = f'{p_true.item():.4f}', p_fake = f'{p_fake.item():.4f}')
 
             if use_wandb is True:
                 wandb_log(train_loss, p_true=p_true, p_fake=p_fake, step = experiment.num_steps, epoch = epoch)

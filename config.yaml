@@ -1,26 +1,30 @@
 model_params:
   channels: 3
   img_size: 224
+  patchsize: 3
+  noise_std: 0.5
   embed_dim: 1600
   input_shape: [3, 224, 224]
+  device: 'cuda'
   
 data_params:
   data_path: "data/"
-  train_batch_size: 2
+  train_batch_size: 8
   test_batch_size:  2
-  num_workers: 2
-  pin_memory: False
+  num_workers: 4
+  pin_memory: True
   
 exp_params:
-  projLR: 0.005
-  dscLR: 0.01
+  projLR: 0.0005
+  dscLR: 0.001
+  scheduler_gamma: 0.995
   dsc_margin: 0.5
   device: 'cuda'
   save_dir: "logs"
-  version: 'SimpleNet_v0.1'
+  version: 'SimpleNet_v0.2'
 
 train_params:
-  max_epochs: 300
+  max_epochs: 150
   use_wandb: False
   seeds: 2024
 

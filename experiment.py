@@ -14,13 +14,16 @@ class Experiment:
         params,
         device='cpu'
     ):
-        self.model = model
-        self.params = params
         self.device = torch.device(device)
+        self.model = model.to(self.device)
+        self.params = params
         self.optimizer_proj = Adam(self.model.projection.parameters(), lr=self.params['projLR'])
         self.optimizer_dsc = Adam(self.model.discriminator.parameters(), lr=self.params['dscLR'])
         self.num_steps = 0
         self.log_dir = os.path.join(self.params['save_dir'], self.params['version'])
+
+        self.scheduler_proj = ExponentialLR(self.optimizer_proj, gamma=self.params['scheduler_gamma'])
+        self.scheduler_dsc = ExponentialLR(self.optimizer_dsc, gamma=self.params['scheduler_gamma'])
         
         self.writer = SummaryWriter(str(self.log_dir))
     
@@ -35,6 +38,12 @@ class Experiment:
         true_scores = scores[:batchlen]
         fake_scores = scores[batchlen:]
         th = self.params['dsc_margin']
+        '''
+        p_true = ((true_scores.detach() - th).abs() < 0.05).sum() / len(true_scores)
+        p_fake = ((fake_scores.detach() - -th).abs() <0.05).sum() / len(fake_scores)
+        true_loss = (-true_scores + th).abs()
+        fake_loss = (fake_scores + th).abs()
+        '''
         p_true = (true_scores.detach() >= th).sum() / len(true_scores)
         p_fake = (fake_scores.detach() < -th).sum() / len(fake_scores)
         true_loss = torch.clip(-true_scores + th, min=0)
@@ -46,6 +55,9 @@ class Experiment:
         loss.backward()
         self.optimizer_proj.step()
         self.optimizer_dsc.step()
+
+        self.scheduler_proj.step()
+        self.scheduler_dsc.step()
 
         self.num_steps += 1
 
@@ -85,8 +97,10 @@ class Experiment:
         with torch.no_grad():
             image_scores, masks, features = self.evaluate_step(batch)
         masks = torch.from_numpy(np.stack(masks, axis=0))
-        features = torch.from_numpy(np.stack(features, axis=0))
-        ng_masks = torch.cat([features, masks], dim=0)
+        # features = torch.from_numpy(np.stack(features, axis=0))
+        mask_tensor_4d = masks.unsqueeze(1).expand(masks.size(0), 3, masks.size(1), masks.size(2))
+        mask_tensor_4d = torch.div(mask_tensor_4d - mask_tensor_4d.min(), mask_tensor_4d.max() - mask_tensor_4d.min())
+        ng_masks = torch.cat([batch, mask_tensor_4d], dim=0)
         sample_path = os.path.join(
                 str(self.log_dir),
                 'Samples',
